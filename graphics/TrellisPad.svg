@@ -15,6 +15,8 @@
    version="1.1"
    inkscape:version="0.48.4 r9939"
    sodipodi:docname="TrellisPad.svg">
+  <title
+     id="title3205">Trellis Button Pad Laser Pattern</title>
   <defs
      id="defs4" />
   <sodipodi:namedview
@@ -25,7 +27,7 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.98994949"
-     inkscape:cx="326.0176"
+     inkscape:cx="169.94903"
      inkscape:cy="199.23322"
      inkscape:document-units="in"
      inkscape:current-layer="layer1"
@@ -44,7 +46,31 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title>Trellis Button Pad Laser Pattern</dc:title>
+        <dc:date>04/27/2014</dc:date>
+        <dc:creator>
+          <cc:Agent>
+            <dc:title>Mikel Duke</dc:title>
+          </cc:Agent>
+        </dc:creator>
+        <dc:rights>
+          <cc:Agent>
+            <dc:title>GPLv2</dc:title>
+          </cc:Agent>
+        </dc:rights>
+        <dc:publisher>
+          <cc:Agent>
+            <dc:title>Mikel Duke</dc:title>
+          </cc:Agent>
+        </dc:publisher>
+        <dc:source>www.mikelduke.com</dc:source>
+        <dc:description>Laser Cut pattern to fit the Trellis buttons sold by Adafruit
+www.mikelduke.com</dc:description>
+        <dc:contributor>
+          <cc:Agent>
+            <dc:title>Mikel Duke www.mikelduke.com</dc:title>
+          </cc:Agent>
+        </dc:contributor>
       </cc:Work>
     </rdf:RDF>
   </metadata>
