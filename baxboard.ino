@@ -20,6 +20,7 @@
 
 //PINS
 #define NUMKEYS 64 //total number of Trellis keys
+#define NUMPOTS 4
 #define MIDIOUT 2  //Pins to use for software serial for midi out
 #define MIDIIN  3  //unused at this time
 #define POT_1 A7   //Analog Pot pins
@@ -86,6 +87,7 @@ LiquidCrystal_I2C lcd(I2C_ADDR,En_pin,Rw_pin,Rs_pin,D4_pin,D5_pin,D6_pin,D7_pin)
 char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#" };
 
 const String boardName = "baxboard";
+uint8_t lastPotVal[NUMPOTS];
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -101,6 +103,9 @@ void setup() {
   lcd.setCursor ( 0, 1 );
   lcd.print(boardName);
 
+  //initialize array of last pot read values
+  for (uint8_t i = 0; i < NUMPOTS; i++)
+    lastPotVal[i] = 0;
 
   trellis.begin(TRELLIS_1, TRELLIS_2, TRELLIS_3, TRELLIS_4);
   
@@ -167,24 +172,63 @@ void readButtons() {
 /**
  * readKnobs
  * 
- * TODO implement this
+ * TODO Add Controller selection (MIDI_CONTROL + Controller#) and make generic
  */
 void readKnobs() {
-  int val = analogRead(POT_1);
+  int val = 0;
+  uint8_t mapVal = 0;
   
-  byte mapVal = map(val, 0, 1023, 0, 255);
+  val = analogRead(POT_1);
+  mapVal = map(val, 0, 1023, 0, 127);
+  if (mapVal != lastPotVal[0]) {
+    #if DEBUG_KNOBS
+      Serial.print("pot1: ");
+      Serial.print(val);
+      Serial.print(" map: ");
+      Serial.println(mapVal);
+    #endif
+    lastPotVal[0] = mapVal;
+    midiCommand(MIDI_CONTROL, 7,  mapVal); //mod
+  }
   
-  #if DEBUG_KNOBS
-    Serial.print("pot1: ");
-    Serial.print(val);
-    Serial.print(" map: ");
-    Serial.println(mapVal);
-  #endif
+  val = analogRead(POT_2);
+  mapVal = map(val, 0, 1023, 0, 127);
+  if (mapVal != lastPotVal[1]) {
+    #if DEBUG_KNOBS
+      Serial.print("pot2: ");
+      Serial.print(val);
+      Serial.print(" map: ");
+      Serial.println(mapVal);
+    #endif
+    lastPotVal[1] = mapVal;
+    midiCommand(MIDI_CONTROL, 10, mapVal); //length
+  }
   
-  //  midiCommand(0xb0, 13, mapVal); //wave
-//  midiCommand(0xb0, 12, mapVal); //envelop
-//  midiCommand(0xb0, 10, mapVal); //length
-  midiCommand(0xb0, 7,  mapVal); //mod
+  val = analogRead(POT_3);
+  mapVal = map(val, 0, 1023, 0, 127);
+  if (mapVal != lastPotVal[2]) {
+    #if DEBUG_KNOBS
+      Serial.print("pot3: ");
+      Serial.print(val);
+      Serial.print(" map: ");
+      Serial.println(mapVal);
+    #endif
+    lastPotVal[2] = mapVal;
+    midiCommand(MIDI_CONTROL, 12, mapVal); //envelop
+  }
+  
+  val = analogRead(POT_4);
+  mapVal = map(val, 0, 1023, 0, 127);
+  if (mapVal != lastPotVal[3]) {
+    #if DEBUG_KNOBS
+      Serial.print("pot4: ");
+      Serial.print(val);
+      Serial.print(" map: ");
+      Serial.println(mapVal);
+    #endif
+    lastPotVal[3] = mapVal;
+    midiCommand(MIDI_CONTROL, 13, mapVal); //wave
+  }
 }
 
 /**
