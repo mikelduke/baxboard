@@ -58,10 +58,18 @@
 #define LCD_Y  2
 
 //MIDI - Based on spec http://www.midi.org/techspecs/midimessages.php
-#define MIDI_NOTE_ON    0x90
-#define MIDI_NOTE_OFF   0x80
-#define MIDI_AFTERTOUCH 0xA0 //unused for now
-#define MIDI_CONTROL    0xB0
+//Status Messages
+#define MIDI_NOTE_ON      0x90
+#define MIDI_NOTE_OFF     0x80
+#define MIDI_AFTERTOUCH   0xA0 //unused for now
+#define MIDI_CONTROL      0xB0
+#define MIDI_PITCH_CHANGE 0xE0
+
+//MIDI Constants
+#define MIDI_CHAN_MAX        15   //16 Channels
+#define MIDI_CONTROLLER_MAX   7   //8 Controllers
+#define MIDI_DATA_MAX       127   //128 Max Values/Notes/Pressures/Etc
+
 
 Adafruit_Trellis matrix0 = Adafruit_Trellis();
 Adafruit_Trellis matrix1 = Adafruit_Trellis();
@@ -236,7 +244,7 @@ void buttonPressed(uint8_t b) {
  * TODO enable loading/changing values
  */
 void sendMidiNote(uint8_t note) {
-  midiCommand(NOTE_ON, note, 0x45); //controller 1, pitch, medium velocity
+  midiCommand(MIDI_NOTE_ON, note, 0x45); //controller 1, pitch, medium velocity
 }
 
 /**
