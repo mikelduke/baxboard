@@ -82,7 +82,10 @@ SoftwareSerial softMidi(MIDIIN, MIDIOUT);
 
 LiquidCrystal_I2C lcd(I2C_ADDR,En_pin,Rw_pin,Rs_pin,D4_pin,D5_pin,D6_pin,D7_pin);
 
-String boardName = "baxboard";
+//Note names
+char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#" };
+
+const String boardName = "baxboard";
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -266,9 +269,35 @@ void midiCommand(uint8_t cmd, uint8_t pitch, uint8_t velocity) {
   #endif
 }
 
+/**
+ * showNote
+ * 
+ * @param note - Note number (0-127)
+ *
+ * Displays the note name on the lcd returned by noteToString and adds the octave
+ */
 void showNote(uint8_t note) {
   lcd.clear();
-  if (note >= 100) lcd.setCursor ( LCD_X - 3, LCD_Y);
-  else lcd.setCursor ( LCD_X - 2, LCD_Y);
-  lcd.print(note);
+  lcd.setCursor(0, LCD_Y);
+  lcd.print("Note:");
+  
+  char* n = noteToString(note);
+  lcd.setCursor( LCD_X - 3, LCD_Y);
+  lcd.print(n);
+  
+  uint8_t octave = 0;
+  if (note > 11) octave = note / 12;
+  if (n[1] == NULL) lcd.print(' ');
+  lcd.print(octave);
+}
+
+/**
+ * noteToString
+ *
+ * @param note - Note Number (0-127)
+ *
+ * Converts the note number to the proper note name on the scale
+ */
+char* noteToString(uint8_t note) {
+  return midiNotes[note % 12];
 }
