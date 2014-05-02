@@ -20,13 +20,8 @@
 
 //PINS
 #define NUMKEYS 64 //total number of Trellis keys
-#define NUMPOTS 4
 #define MIDIOUT 2  //Pins to use for software serial for midi out
 #define MIDIIN  3  //unused at this time
-#define POT_1 A7   //Analog Pot pins
-#define POT_2 A6
-#define POT_3 A3
-#define POT_4 A2
 #define JOY_X A1   //Joystick pins
 #define JOY_Y A0
 #define BUTTON_1 4 //The four buttons above the knobs
@@ -87,6 +82,10 @@ LiquidCrystal_I2C lcd(I2C_ADDR,En_pin,Rw_pin,Rs_pin,D4_pin,D5_pin,D6_pin,D7_pin)
 char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#" };
 
 const String boardName = "baxboard";
+
+#define NUMPOTS 4
+uint8_t knob[]           = { A7, A6, A3, A2 };
+uint8_t midiController[] = {  7, 10, 12, 13 }; //default controller ids
 uint8_t lastPotVal[NUMPOTS];
 
 void setup() {
@@ -172,62 +171,39 @@ void readButtons() {
 /**
  * readKnobs
  * 
- * TODO Add Controller selection (MIDI_CONTROL + Controller#) and make generic
+ * TODO Add Controller selection (MIDI_CONTROL + Controller#)
  */
 void readKnobs() {
   int val = 0;
   uint8_t mapVal = 0;
   
-  val = analogRead(POT_1);
-  mapVal = map(val, 0, 1023, 0, 127);
-  if (mapVal != lastPotVal[0]) {
-    #if DEBUG_KNOBS
-      Serial.print("pot1: ");
-      Serial.print(val);
-      Serial.print(" map: ");
-      Serial.println(mapVal);
-    #endif
-    lastPotVal[0] = mapVal;
-    midiCommand(MIDI_CONTROL, 7,  mapVal); //mod
-  }
-  
-  val = analogRead(POT_2);
-  mapVal = map(val, 0, 1023, 0, 127);
-  if (mapVal != lastPotVal[1]) {
-    #if DEBUG_KNOBS
-      Serial.print("pot2: ");
-      Serial.print(val);
-      Serial.print(" map: ");
-      Serial.println(mapVal);
-    #endif
-    lastPotVal[1] = mapVal;
-    midiCommand(MIDI_CONTROL, 10, mapVal); //length
-  }
-  
-  val = analogRead(POT_3);
-  mapVal = map(val, 0, 1023, 0, 127);
-  if (mapVal != lastPotVal[2]) {
-    #if DEBUG_KNOBS
-      Serial.print("pot3: ");
-      Serial.print(val);
-      Serial.print(" map: ");
-      Serial.println(mapVal);
-    #endif
-    lastPotVal[2] = mapVal;
-    midiCommand(MIDI_CONTROL, 12, mapVal); //envelop
-  }
-  
-  val = analogRead(POT_4);
-  mapVal = map(val, 0, 1023, 0, 127);
-  if (mapVal != lastPotVal[3]) {
-    #if DEBUG_KNOBS
-      Serial.print("pot4: ");
-      Serial.print(val);
-      Serial.print(" map: ");
-      Serial.println(mapVal);
-    #endif
-    lastPotVal[3] = mapVal;
-    midiCommand(MIDI_CONTROL, 13, mapVal); //wave
+  for (uint8_t i = 0; i < NUMPOTS; i++) {
+    val = analogRead(knob[i]);
+    mapVal = map(val, 0, 1023, 0, 127);
+    if (mapVal != lastPotVal[i]) {
+      
+      lcd.setCursor(0, 0);
+      lcd.print("Knob ");
+      lcd.print(i + 1);
+      lcd.print(':');
+      
+      for (uint8_t i = 7; i < LCD_X - 3; i++) lcd.print(' ');
+      if (mapVal < 100) lcd.print(' ');
+      if (mapVal <  10) lcd.print(' ');
+      lcd.print(mapVal);
+      
+      #if DEBUG_KNOBS
+        Serial.print("pot ");
+        Serial.print(i);
+        Serial.print(": ");
+        Serial.print(val);
+        Serial.print(" map: ");
+        Serial.println(mapVal);
+      #endif
+      
+      lastPotVal[i] = mapVal;
+      midiCommand(MIDI_CONTROL, midiController[i],  mapVal); //mod
+    }
   }
 }
 
@@ -238,7 +214,7 @@ void readKnobs() {
  * @return uint8_t corrected button number
  *
  * Remaps button numbers to go 0-63 from bottom left to upper right
- * 
+ * TODO - create unmapButton(mButton) to convert from mapped button to trellis, possible use for led correction
  */
 uint8_t mapButton(uint8_t button) {
   if (button >= 12 && button < 16)     button -= 12;  //bottom left trellis  0
@@ -321,12 +297,12 @@ void midiCommand(uint8_t cmd, uint8_t pitch, uint8_t velocity) {
  * Displays the note name on the lcd returned by noteToString and adds the octave
  */
 void showNote(uint8_t note) {
-  lcd.clear();
   lcd.setCursor(0, LCD_Y);
   lcd.print("Note:");
   
+  for (uint8_t i = 5; i < LCD_X - 3; i++) lcd.print(' ');
+  
   char* n = noteToString(note);
-  lcd.setCursor( LCD_X - 3, LCD_Y);
   lcd.print(n);
   
   uint8_t octave = 0;
