@@ -14,21 +14,18 @@
 #include <LCD.h>
 #include <LiquidCrystal_I2C.h>
 
-#define DEBUG_BUTTONS false
+#define DEBUG_TRELLIS false
+#define DEBUG_BUTTONS true
 #define DEBUG_KNOBS false
-#define DEBUG_MIDI true
+#define DEBUG_MIDI false
 
 //PINS
-#define NUMKEYS 64 //total number of Trellis keys
 #define MIDIOUT 2  //Pins to use for software serial for midi out
 #define MIDIIN  3  //unused at this time
 #define JOY_X A1   //Joystick pins
 #define JOY_Y A0
-#define BUTTON_1 4 //The four buttons above the knobs
-#define BUTTON_2 5
-#define BUTTON_3 6
-#define BUTTON_4 7
 
+#define NUMKEYS 64 //total number of Trellis keys
 #define TRELLIS_1 0x70
 #define TRELLIS_2 0x71
 #define TRELLIS_3 0x72
@@ -65,6 +62,7 @@
 #define MIDI_CHAN_MAX        15   //16 Channels
 #define MIDI_CONTROLLER_MAX   7   //8 Controllers
 #define MIDI_DATA_MAX       127   //128 Max Values/Notes/Pressures/Etc
+#define MIDI_VOICE_DEFAULT    0   //default voice to use 0-15
 
 
 Adafruit_Trellis matrix0 = Adafruit_Trellis();
@@ -84,9 +82,15 @@ char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#"
 const String boardName = "baxboard";
 
 #define NUMPOTS 4
-uint8_t knob[]           = { A7, A6, A3, A2 };
+uint8_t knob[]           = { A7, A6, A3, A2 }; //knob pin numbers
 uint8_t midiController[] = {  7, 10, 12, 13 }; //default controller ids
 uint8_t lastPotVal[NUMPOTS];
+
+#define NUMBUTTONS 4
+uint8_t button[] = { 4, 5, 6, 7 }; //button pin numbers
+uint8_t lastButtonVal[NUMBUTTONS];
+
+uint8_t selectedVoice = MIDI_VOICE_DEFAULT;
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -105,6 +109,11 @@ void setup() {
   //initialize array of last pot read values
   for (uint8_t i = 0; i < NUMPOTS; i++)
     lastPotVal[i] = 0;
+   
+   for (uint8_t i = 0; i < NUMBUTTONS; i++) {
+    pinMode(button[i], INPUT_PULLUP);
+    lastButtonVal[i] = HIGH;
+  }
 
   trellis.begin(TRELLIS_1, TRELLIS_2, TRELLIS_3, TRELLIS_4);
   
@@ -117,8 +126,9 @@ void setup() {
 void loop() {
   delay(MAIN_LOOP_DELAY);
   
-  readButtons();
+  readTrellis();
   readKnobs();
+  readButtons();
 }
 
 /**
@@ -141,13 +151,13 @@ void ledDemo() {
 }
 
 /**
- * readButtons
+ * readTrellis
  *
- * Reads the buttons that are pressed and calls buttonPressed with the 
+ * Reads the buttons that are pressed and calls trellisPressed with the 
  * corrected button number, turns pressed button leds on until they are 
  * released.
  */
-void readButtons() {
+void readTrellis() {
   if (trellis.readSwitches()) {
     for (uint8_t i = 0; i < NUMKEYS; i++) {
       if (trellis.justPressed(i)) {
@@ -155,7 +165,7 @@ void readButtons() {
         
         Serial.print("v"); Serial.println(m);
         trellis.setLED(i);
-        buttonPressed(m);
+        trellisPressed(m);
       } 
       else if (trellis.justReleased(i)) {
         uint8_t m = mapButton(i);
@@ -202,8 +212,24 @@ void readKnobs() {
       #endif
       
       lastPotVal[i] = mapVal;
-      midiCommand(MIDI_CONTROL, midiController[i],  mapVal); //mod
+      midiCommand(MIDI_CONTROL + selectedVoice, midiController[i],  mapVal); //mod
     }
+  }
+}
+
+/**
+ * readButtons
+ *
+ */
+void readButtons() {
+  for (uint8_t i = 0; i < NUMBUTTONS; i++) {
+    uint8_t val = digitalRead(button[i]);
+    #if DEBUG_BUTTONS
+      Serial.print("button ");
+      Serial.print(i);
+      Serial.print(": ");
+      Serial.println(val);
+    #endif
   }
 }
 
@@ -237,7 +263,7 @@ uint8_t mapButton(uint8_t button) {
   else if (button >= 52 && button < 56) ;             //                    52
   else /*  button >= 48 && button < 52*/button += 12; //                    60
   
-  #if DEBUG_BUTTONS
+  #if DEBUG_TRELLIS
     Serial.print("Mapped button: ");
     Serial.println(button);
   #endif
@@ -246,13 +272,13 @@ uint8_t mapButton(uint8_t button) {
 }
 
 /**
- * buttonPressed
+ * trellisPressed
  * 
  * @param uint8_t b - Corrected button number
  *
  * TODO: check settings to change what should happen when a button is pressed
  */
-void buttonPressed(uint8_t b) {
+void trellisPressed(uint8_t b) {
   b += 0x1E;
   showNote(b);
   sendMidiNote(b);
@@ -267,7 +293,7 @@ void buttonPressed(uint8_t b) {
  * TODO enable loading/changing values
  */
 void sendMidiNote(uint8_t note) {
-  midiCommand(MIDI_NOTE_ON, note, 0x45); //controller 1, pitch, medium velocity
+  midiCommand(MIDI_NOTE_ON + selectedVoice, note, 0x45); //controller 1, pitch, medium velocity
 }
 
 /**
