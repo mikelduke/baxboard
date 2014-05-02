@@ -24,6 +24,7 @@
 #define MIDIIN  3  //unused at this time
 #define JOY_X A1   //Joystick pins
 #define JOY_Y A0
+#define BUTTON_PRESSED LOW
 
 #define NUMKEYS 64 //total number of Trellis keys
 #define TRELLIS_1 0x70
@@ -59,7 +60,7 @@
 #define MIDI_PITCH_CHANGE 0xE0
 
 //MIDI Constants
-#define MIDI_CHAN_MAX        15   //16 Channels
+#define MIDI_CHAN_MAX        16   //16 Channels
 #define MIDI_CONTROLLER_MAX   7   //8 Controllers
 #define MIDI_DATA_MAX       127   //128 Max Values/Notes/Pressures/Etc
 #define MIDI_VOICE_DEFAULT    0   //default voice to use 0-15
@@ -222,15 +223,25 @@ void readKnobs() {
  *
  */
 void readButtons() {
+  #if DEBUG_BUTTONS
+    Serial.print("button ");
+  #endif
   for (uint8_t i = 0; i < NUMBUTTONS; i++) {
     uint8_t val = digitalRead(button[i]);
     #if DEBUG_BUTTONS
-      Serial.print("button ");
-      Serial.print(i);
-      Serial.print(": ");
-      Serial.println(val);
+      Serial.print(val);
+      Serial.print(", ");
     #endif
+    
+    if (val != lastButtonVal[i]) {
+      if (val == BUTTON_PRESSED)
+        buttonPressed(i);
+      lastButtonVal[i] = val;
+    }
   }
+  #if DEBUG_BUTTONS
+    Serial.println();
+  #endif
 }
 
 /**
@@ -282,6 +293,27 @@ void trellisPressed(uint8_t b) {
   b += 0x1E;
   showNote(b);
   sendMidiNote(b);
+}
+
+/**
+ * buttonPressed
+ *
+ * @param uint8_t b - Button number that was pressed
+ *
+ * Handler for button presses, expects 4 buttons (0-3)
+ */
+void buttonPressed(uint8_t b) {
+  if (b == 2 || b == 3) {
+    if (b == 2 && selectedVoice < MIDI_CHAN_MAX) selectedVoice++;
+    else if (b == 3 && selectedVoice > 0) selectedVoice--;
+    
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Voice: ");
+    lcd.setCursor(LCD_X - 2, 0);
+    if (selectedVoice < 10) lcd.print(' ');
+    lcd.print(selectedVoice);
+  }
 }
 
 /**
