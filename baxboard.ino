@@ -26,17 +26,19 @@
 #define JOY_Y A0
 #define BUTTON_PRESSED LOW
 
+//Trellis info
 #define NUMKEYS 64 //total number of Trellis keys
 #define TRELLIS_1 0x70
 #define TRELLIS_2 0x71
 #define TRELLIS_3 0x72
 #define TRELLIS_4 0x73
 
+//Serial values
 #define MIDI_BAUD 31250
 #define SERIAL_BAUD 9600
 
-#define MAIN_LOOP_DELAY 30
-#define TRELLIS_BUTTON_DELAY 10
+#define MAIN_LOOP_DELAY 30      //delay needed for trellis, maybe could be reduced?
+#define TRELLIS_BUTTON_DELAY 10 //delay for i2c operations
 
 //I2C LCD
 #define I2C_ADDR      0x27  // Define I2C Address where the PCF8574A is
@@ -48,8 +50,8 @@
 #define D5_pin  5
 #define D6_pin  6
 #define D7_pin  7
-#define LCD_X 16
-#define LCD_Y  2
+#define LCD_X 16  //Characters wide
+#define LCD_Y  2  //Line tall
 
 //MIDI - Based on spec http://www.midi.org/techspecs/midimessages.php
 //Status Messages
@@ -60,12 +62,12 @@
 #define MIDI_PITCH_CHANGE 0xE0
 
 //MIDI Constants
-#define MIDI_CHAN_MAX        16   //16 Channels
+#define MIDI_CHAN_MAX        16   //16 Channels -- 16 voices 0-15
 #define MIDI_CONTROLLER_MAX   7   //8 Controllers
 #define MIDI_DATA_MAX       127   //128 Max Values/Notes/Pressures/Etc
-#define MIDI_VOICE_DEFAULT    0   //default voice to use 0-15
+#define MIDI_VOICE_DEFAULT    0   //default voice to use 0-15. probably 0
 
-
+//Trellis setup
 Adafruit_Trellis matrix0 = Adafruit_Trellis();
 Adafruit_Trellis matrix1 = Adafruit_Trellis();
 Adafruit_Trellis matrix2 = Adafruit_Trellis();
@@ -82,11 +84,13 @@ char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#"
 
 const String boardName = "baxboard";
 
+//Knob setup
 #define NUMPOTS 4
 uint8_t knob[]           = { A7, A6, A3, A2 }; //knob pin numbers
 uint8_t midiController[] = {  7, 10, 12, 13 }; //default controller ids
 uint8_t lastPotVal[NUMPOTS];
 
+//Button setup
 #define NUMBUTTONS 4
 uint8_t button[] = { 4, 5, 6, 7 }; //button pin numbers
 uint8_t lastButtonVal[NUMBUTTONS];
@@ -99,18 +103,19 @@ void setup() {
   
   softMidi.begin(MIDI_BAUD);
   
+  //init array of last pot read values and send current knob positions to synth
+  for (uint8_t i = 0; i < NUMPOTS; i++)
+    lastPotVal[i] = 0;
+  readKnobs();
+  
+  //init lcd
   lcd.begin (LCD_X, LCD_Y);
   lcd.setBacklightPin(BACKLIGHT_PIN,POSITIVE);
   lcd.setBacklight(HIGH);
   lcd.home();
-  lcd.print("Welcome to");  
-  lcd.setCursor ( 0, 1 );
-  lcd.print(boardName);
-
-  //initialize array of last pot read values
-  for (uint8_t i = 0; i < NUMPOTS; i++)
-    lastPotVal[i] = 0;
-   
+  lcd.print("Startup");
+  
+  //init buttons
    for (uint8_t i = 0; i < NUMBUTTONS; i++) {
     pinMode(button[i], INPUT_PULLUP);
     lastButtonVal[i] = HIGH;
@@ -121,6 +126,10 @@ void setup() {
   ledDemo();
   
   lcd.clear();
+  lcd.home();
+  lcd.print("Welcome to");  
+  lcd.setCursor ( 0, 1 );
+  lcd.print(boardName);
 }
 
 
@@ -157,6 +166,9 @@ void ledDemo() {
  * Reads the buttons that are pressed and calls trellisPressed with the 
  * corrected button number, turns pressed button leds on until they are 
  * released.
+ *
+ * Note: This only detects buttons when they are pressed. Holding buttons 
+ * currently has no different effect other than the lcd stays lit.
  */
 void readTrellis() {
   if (trellis.readSwitches()) {
@@ -182,7 +194,12 @@ void readTrellis() {
 /**
  * readKnobs
  * 
- * TODO Add Controller selection (MIDI_CONTROL + Controller#)
+ * Reads the knobs, if the value of one is different from the previous read, 
+ * then is sends its value to the midicontroller number selected for the 
+ * selected voice. 
+ *
+ * Note: Currently, when the voice is changed, the knobs do not resend their 
+ * values. This helps to preserve the previous voice's settings.
  */
 void readKnobs() {
   int val = 0;
@@ -221,6 +238,7 @@ void readKnobs() {
 /**
  * readButtons
  *
+ * TODO change to debouncer with timer so that presses can be repeated if the button is held down
  */
 void readButtons() {
   #if DEBUG_BUTTONS
