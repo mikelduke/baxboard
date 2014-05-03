@@ -15,15 +15,13 @@
 #include <LiquidCrystal_I2C.h>
 
 #define DEBUG_TRELLIS false
-#define DEBUG_BUTTONS true
+#define DEBUG_BUTTONS false
 #define DEBUG_KNOBS false
 #define DEBUG_MIDI false
 
 //PINS
 #define MIDIOUT 2  //Pins to use for software serial for midi out
 #define MIDIIN  3  //unused at this time
-#define JOY_X A1   //Joystick pins
-#define JOY_Y A0
 #define BUTTON_PRESSED LOW
 
 //Trellis info
@@ -63,9 +61,11 @@
 
 //MIDI Constants
 #define MIDI_CHAN_MAX        16   //16 Channels -- 16 voices 0-15
-#define MIDI_CONTROLLER_MAX   7   //8 Controllers
+#define MIDI_CONTROLLER_MAX 120   //120 Controllers
 #define MIDI_DATA_MAX       127   //128 Max Values/Notes/Pressures/Etc
 #define MIDI_VOICE_DEFAULT    0   //default voice to use 0-15. probably 0
+
+#define MIDI_VELOCITY_ID 128      //Controller number to be mapped to Velocity byte
 
 //Trellis setup
 Adafruit_Trellis matrix0 = Adafruit_Trellis();
@@ -85,9 +85,9 @@ char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#"
 const String boardName = "baxboard";
 
 //Knob setup
-#define NUMPOTS 4
-uint8_t knob[]           = { A7, A6, A3, A2 }; //knob pin numbers
-uint8_t midiController[] = {  7, 10, 12, 13 }; //default controller ids
+#define NUMPOTS 6
+uint8_t knob[]           = { A7, A6, A3, A2, A1, A0 }; //knob pin numbers
+uint8_t midiController[] = {  7, 10, 12, 13, MIDI_VELOCITY_ID, 14 }; //default controller ids
 uint8_t lastPotVal[NUMPOTS];
 
 //Button setup
@@ -96,6 +96,8 @@ uint8_t button[] = { 4, 5, 6, 7 }; //button pin numbers
 uint8_t lastButtonVal[NUMBUTTONS];
 
 uint8_t selectedVoice = MIDI_VOICE_DEFAULT;
+
+boolean sendNoteOff = false;
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -184,7 +186,8 @@ void readTrellis() {
         uint8_t m = mapButton(i);
         
         Serial.print("^"); Serial.println(m);
-        trellis.clrLED(i); //TODO maybe add note off
+        trellis.clrLED(i);
+        trellisReleased(m);
       }
     }
     trellis.writeDisplay();
@@ -230,7 +233,10 @@ void readKnobs() {
       #endif
       
       lastPotVal[i] = mapVal;
-      midiCommand(MIDI_CONTROL + selectedVoice, midiController[i],  mapVal); //mod
+	  
+      //only send control commands for valid controller numbers; >= 128 is reserved for other internal mappings
+      if (midiController[i] < 128)
+        midiCommand(MIDI_CONTROL + selectedVoice, midiController[i],  mapVal); //mod
     }
   }
 }
@@ -244,6 +250,7 @@ void readButtons() {
   #if DEBUG_BUTTONS
     Serial.print("button ");
   #endif
+  
   for (uint8_t i = 0; i < NUMBUTTONS; i++) {
     uint8_t val = digitalRead(button[i]);
     #if DEBUG_BUTTONS
@@ -257,6 +264,7 @@ void readButtons() {
       lastButtonVal[i] = val;
     }
   }
+  
   #if DEBUG_BUTTONS
     Serial.println();
   #endif
@@ -308,9 +316,21 @@ uint8_t mapButton(uint8_t button) {
  * TODO: check settings to change what should happen when a button is pressed
  */
 void trellisPressed(uint8_t b) {
-  b += 0x1E;
+  b += 0x1E; //TODO: replace with a starting note setting
   showNote(b);
   sendMidiNote(b);
+}
+
+/**
+ * trellisReleased
+ *
+ * @param uint8_t b - Corrected button number
+ *
+ * Send note off, command is note with Velocity = 0
+ */
+void trellisReleased(uint8_t b) {
+  if (sendNoteOff)
+    midiCommand(MIDI_NOTE_OFF + selectedVoice, b, 0);
 }
 
 /**
@@ -340,10 +360,20 @@ void buttonPressed(uint8_t b) {
  * @param uint8_t note
  
  * Simple stub function to output midi note based with presets
- * TODO enable loading/changing values
+ * 
  */
 void sendMidiNote(uint8_t note) {
-  midiCommand(MIDI_NOTE_ON + selectedVoice, note, 0x45); //controller 1, pitch, medium velocity
+  uint8_t v = 0x45;
+  
+  //loop through knob controller ids to find if one is mapped to velocity, use last value
+  for (uint8_t i = 0; i < NUMPOTS; i++) {
+    if (midiController[i] == MIDI_VELOCITY_ID) {
+      v = lastPotVal[i];
+      break;
+    }
+  }
+  
+  midiCommand(MIDI_NOTE_ON + selectedVoice, note, v);
 }
 
 /**
