@@ -6,6 +6,8 @@
   
   https://github.com/mikelduke/baxboard
   
+  GPLv2
+  
 ***************************************************/
 
 #include <Wire.h>
@@ -13,11 +15,14 @@
 #include <SoftwareSerial.h>
 #include <LCD.h>
 #include <LiquidCrystal_I2C.h>
+#include <EEPROM.h>
 
-#define DEBUG_TRELLIS false
-#define DEBUG_BUTTONS false
-#define DEBUG_KNOBS false
-#define DEBUG_MIDI false
+#define DEBUG_TRELLIS        false
+#define DEBUG_BUTTONS        false
+#define DEBUG_KNOBS          false
+#define DEBUG_MIDI           false
+#define DEBUG_LOOP_TIME      false
+#define DEBUG_BUTTON_PRESSED false
 
 //PINS
 #define MIDIOUT 2  //Pins to use for software serial for midi out
@@ -67,6 +72,17 @@
 
 #define MIDI_VELOCITY_ID 128      //Controller number to be mapped to Velocity byte
 
+
+//EEPROM Addresses
+#define ADR_VOICE 0
+#define ADR_POT0  1
+#define ADR_POT1  2
+#define ADR_POT2  3
+#define ADR_POT3  4
+#define ADR_POT4  5
+#define ADR_POT5  6
+
+
 //Trellis setup
 Adafruit_Trellis matrix0 = Adafruit_Trellis();
 Adafruit_Trellis matrix1 = Adafruit_Trellis();
@@ -92,23 +108,37 @@ uint8_t lastPotVal[NUMPOTS];
 
 //Button setup
 #define NUMBUTTONS 4
+#define BUTTON_UP    0
+#define BUTTON_DOWN  1
+#define BUTTON_LEFT  2
+#define BUTTON_RIGHT 3
 uint8_t button[] = { 4, 5, 6, 7 }; //button pin numbers
 uint8_t lastButtonVal[NUMBUTTONS];
 
 uint8_t selectedVoice = MIDI_VOICE_DEFAULT;
 
-boolean sendNoteOff = false;
+boolean sendNoteOff = true;
+
+long lastTime = 0; //debug variable used to hold loop start time
+
+//Menu system setup and states
+#define NUMMENU 8       //increase to match new menu options
+enum menuItems { SETVOICE, SETPOT0, SETPOT1, SETPOT2, SETPOT3, SETPOT4, SETPOT5, SAVE };
+uint8_t menuState = SETVOICE;
+prog_char menu_0[] PROGMEM = "Set Voice";
+prog_char menu_1[] PROGMEM = "Set Knob 1";
+prog_char menu_2[] PROGMEM = "Set Knob 2";
+prog_char menu_3[] PROGMEM = "Set Knob 3";
+prog_char menu_4[] PROGMEM = "Set Knob 4";
+prog_char menu_5[] PROGMEM = "Set Joy X";
+prog_char menu_6[] PROGMEM = "Set Joy Y";
+prog_char menu_7[] PROGMEM = "Save Settings";
+PROGMEM const char *menuTable[] = { menu_0, menu_1, menu_2, menu_3, menu_4, menu_5, menu_6, menu_7 };
+char menuBuffer[LCD_X + 1];       //max lcd size + null terminator
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
   Serial.println(boardName);
-  
-  softMidi.begin(MIDI_BAUD);
-  
-  //init array of last pot read values and send current knob positions to synth
-  for (uint8_t i = 0; i < NUMPOTS; i++)
-    lastPotVal[i] = 0;
-  readKnobs();
   
   //init lcd
   lcd.begin (LCD_X, LCD_Y);
@@ -117,12 +147,21 @@ void setup() {
   lcd.home();
   lcd.print("Startup");
   
+  softMidi.begin(MIDI_BAUD);
+  
+  //init array of last pot read values and send current knob positions to synth
+  for (uint8_t i = 0; i < NUMPOTS; i++)
+    lastPotVal[i] = 0;
+  readKnobs();
+  
   //init buttons
    for (uint8_t i = 0; i < NUMBUTTONS; i++) {
     pinMode(button[i], INPUT_PULLUP);
     lastButtonVal[i] = HIGH;
   }
-
+  
+  loadEEPROMValues();
+  
   trellis.begin(TRELLIS_1, TRELLIS_2, TRELLIS_3, TRELLIS_4);
   
   ledDemo();
@@ -136,11 +175,69 @@ void setup() {
 
 
 void loop() {
+  #if DEBUG_LOOP_TIME
+    lastTime = millis();
+  #endif
+  
   delay(MAIN_LOOP_DELAY);
   
   readTrellis();
   readKnobs();
   readButtons();
+  
+  #if DEBUG_LOOP_TIME
+    Serial.print("Loop time: ");
+    Serial.println(millis() - lastTime);
+  #endif
+}
+
+/**
+ * loadEEPROMValues
+ *
+ * Only ran from setup, load stored values from EEPROM.
+ * 
+ * Note: 255 is the default unwritten value, but with the midi spec most items
+ * max out at 127 so we know these values were not written by this app
+ */
+void loadEEPROMValues() {
+  uint8_t readVal = EEPROM.read(ADR_VOICE);
+  if (readVal < 255) selectedVoice = readVal;
+  
+  readVal = EEPROM.read(ADR_POT0);
+  if (readVal < 255) midiController[0] = readVal;
+  
+  readVal = EEPROM.read(ADR_POT1);
+  if (readVal < 255) midiController[1] = readVal;
+  
+  readVal = EEPROM.read(ADR_POT2);
+  if (readVal < 255) midiController[2] = readVal;
+  
+  readVal = EEPROM.read(ADR_POT3);
+  if (readVal < 255) midiController[3] = readVal;
+  
+  readVal = EEPROM.read(ADR_POT4);
+  if (readVal < 255) midiController[4] = readVal;
+  
+  readVal = EEPROM.read(ADR_POT5);
+  if (readVal < 255) midiController[5] = readVal;
+}
+
+/**
+ * saveEEPROMValues
+ *
+ * Saves current variables to eeprom using predefined addressed. 
+ * 
+ * Note: When adding additional pots/controls need to add lines to this 
+ * function and the read function, in addition to the #defines above.
+ */
+void saveEEPROMValues() {
+  EEPROM.write(ADR_VOICE, selectedVoice);
+  EEPROM.write(ADR_POT0, midiController[0]);
+  EEPROM.write(ADR_POT1, midiController[1]);
+  EEPROM.write(ADR_POT2, midiController[2]);
+  EEPROM.write(ADR_POT3, midiController[3]);
+  EEPROM.write(ADR_POT4, midiController[4]);
+  EEPROM.write(ADR_POT5, midiController[5]);
 }
 
 /**
@@ -178,14 +275,20 @@ void readTrellis() {
       if (trellis.justPressed(i)) {
         uint8_t m = mapButton(i);
         
-        Serial.print("v"); Serial.println(m);
+        #if DEBUG_TRELLIS
+          Serial.print("v"); Serial.println(m);
+        #endif
+        
         trellis.setLED(i);
         trellisPressed(m);
       } 
       else if (trellis.justReleased(i)) {
         uint8_t m = mapButton(i);
         
-        Serial.print("^"); Serial.println(m);
+        #if DEBUG_TRELLIS
+          Serial.print("^"); Serial.println(m);
+        #endif
+        
         trellis.clrLED(i);
         trellisReleased(m);
       }
@@ -339,19 +442,91 @@ void trellisReleased(uint8_t b) {
  * @param uint8_t b - Button number that was pressed
  *
  * Handler for button presses, expects 4 buttons (0-3)
+ * Controls menu changes and events
  */
 void buttonPressed(uint8_t b) {
-  if (b == 2 || b == 3) {
-    if (b == 2 && selectedVoice < MIDI_CHAN_MAX) selectedVoice++;
-    else if (b == 3 && selectedVoice > 0) selectedVoice--;
-    
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Voice: ");
+  #if DEBUG_BUTTON_PRESSED
+    Serial.print("Button: ");
+    Serial.print(b);
+    Serial.print(" old menuState: ");
+    Serial.print(menuState);
+  #endif
+  
+  //handle menu changes first
+  if (b == BUTTON_UP && menuState > 0) menuState--;
+  else if (b == BUTTON_DOWN && menuState + 1 < NUMMENU) menuState++;
+  showMenuItem();
+  
+  #if DEBUG_BUTTON_PRESSED
+    Serial.print(" new menuState: ");
+    Serial.println(menuState);
+  #endif
+  
+  //handle voice changes
+  if (menuState == SETVOICE) {
+    if (b == BUTTON_LEFT && selectedVoice > 0) selectedVoice--;
+    else if (b == BUTTON_RIGHT && selectedVoice + 1 < MIDI_CHAN_MAX) selectedVoice++;
+
     lcd.setCursor(LCD_X - 2, 0);
     if (selectedVoice < 10) lcd.print(' ');
-    lcd.print(selectedVoice);
+    lcd.print(selectedVoice + 1);
   }
+  else if (menuState == SETPOT0) {
+    changeMidiController(b, 0);
+  }
+  else if (menuState == SETPOT1) {
+    changeMidiController(b, 1);
+  }
+  else if (menuState == SETPOT2) {
+    changeMidiController(b, 2);
+  }
+  else if (menuState == SETPOT3) {
+    changeMidiController(b, 3);
+  }
+  else if (menuState == SETPOT4) {
+    changeMidiController(b, 4);
+  }
+  else if (menuState == SETPOT5) {
+    changeMidiController(b, 5);
+  }
+  else if (menuState == SAVE) {
+    if (b == BUTTON_LEFT || b == BUTTON_RIGHT) {
+      saveEEPROMValues();
+      lcd.setCursor(LCD_X - 4, 0);
+      lcd.print("Done");
+    }
+  }
+}
+
+/**
+ * changeMidiController
+ *
+ * @param b - Button Number
+ * @param c - Knob Number
+ *
+ * Handles menu state changes for midi controller ids
+ */
+void changeMidiController(uint8_t b, uint8_t c) {
+  if (b == BUTTON_LEFT && midiController[c] > 0) midiController[c]--;
+  else if (b == BUTTON_RIGHT && midiController[c] + 1 < 200) midiController[c]++;
+
+  lcd.setCursor(LCD_X - 3, 0);
+  if (midiController[c] < 100) lcd.print(' ');
+  if (midiController[c] <  10) lcd.print(' ');
+  lcd.print(midiController[c]);
+}
+
+/**
+ * showMenuItem
+ * 
+ * Loads and displays the string for the selected menuState from PROGMEM
+ */
+void showMenuItem() {
+  strcpy_P(menuBuffer, (char*)pgm_read_word(&(menuTable[menuState]))); //load menu text from progmem
+    
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(menuBuffer);
 }
 
 /**
