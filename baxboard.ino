@@ -74,13 +74,14 @@
 
 
 //EEPROM Addresses
-#define ADR_VOICE 0
-#define ADR_POT0  1
-#define ADR_POT1  2
-#define ADR_POT2  3
-#define ADR_POT3  4
-#define ADR_POT4  5
-#define ADR_POT5  6
+#define ADR_VOICE     0
+#define ADR_POT0      1
+#define ADR_POT1      2
+#define ADR_POT2      3
+#define ADR_POT3      4
+#define ADR_POT4      5
+#define ADR_POT5      6
+#define ADR_STARTNOTE 7
 
 
 //Trellis setup
@@ -118,12 +119,13 @@ uint8_t lastButtonVal[NUMBUTTONS];
 uint8_t selectedVoice = MIDI_VOICE_DEFAULT;
 
 boolean sendNoteOff = true;
+uint8_t startingNote = 0x1E;
 
 long lastTime = 0; //debug variable used to hold loop start time
 
 //Menu system setup and states
-#define NUMMENU 8       //increase to match new menu options
-enum menuItems { SETVOICE, SETPOT0, SETPOT1, SETPOT2, SETPOT3, SETPOT4, SETPOT5, SAVE };
+#define NUMMENU 9       //increase to match new menu options
+enum menuItems { SETVOICE, SETPOT0, SETPOT1, SETPOT2, SETPOT3, SETPOT4, SETPOT5, SETSTART_NOTE, SAVE };
 uint8_t menuState = SETVOICE;
 prog_char menu_0[] PROGMEM = "Set Voice";
 prog_char menu_1[] PROGMEM = "Set Knob 1";
@@ -132,8 +134,9 @@ prog_char menu_3[] PROGMEM = "Set Knob 3";
 prog_char menu_4[] PROGMEM = "Set Knob 4";
 prog_char menu_5[] PROGMEM = "Set Joy X";
 prog_char menu_6[] PROGMEM = "Set Joy Y";
-prog_char menu_7[] PROGMEM = "Save Settings";
-PROGMEM const char *menuTable[] = { menu_0, menu_1, menu_2, menu_3, menu_4, menu_5, menu_6, menu_7 };
+prog_char menu_7[] PROGMEM = "Start Note";
+prog_char menu_8[] PROGMEM = "Save Settings";
+PROGMEM const char *menuTable[] = { menu_0, menu_1, menu_2, menu_3, menu_4, menu_5, menu_6, menu_7, menu_8 };
 char menuBuffer[LCD_X + 1];       //max lcd size + null terminator
 
 void setup() {
@@ -220,6 +223,9 @@ void loadEEPROMValues() {
   
   readVal = EEPROM.read(ADR_POT5);
   if (readVal < 255) midiController[5] = readVal;
+  
+  readVal = EEPROM.read(ADR_STARTNOTE);
+  if (readVal < 255) startingNote = readVal;
 }
 
 /**
@@ -238,6 +244,7 @@ void saveEEPROMValues() {
   EEPROM.write(ADR_POT3, midiController[3]);
   EEPROM.write(ADR_POT4, midiController[4]);
   EEPROM.write(ADR_POT5, midiController[5]);
+  EEPROM.write(ADR_STARTNOTE, startingNote);
 }
 
 /**
@@ -419,7 +426,7 @@ uint8_t mapButton(uint8_t button) {
  * TODO: check settings to change what should happen when a button is pressed
  */
 void trellisPressed(uint8_t b) {
-  b += 0x1E; //TODO: replace with a starting note setting
+  b += startingNote;
   showNote(b);
   sendMidiNote(b);
 }
@@ -489,6 +496,13 @@ void buttonPressed(uint8_t b) {
   else if (menuState == SETPOT5) {
     changeMidiController(b, 5);
   }
+  else if (menuState == SETSTART_NOTE) {
+    if (b == BUTTON_LEFT && startingNote > 0) startingNote--;
+    else if (b == BUTTON_RIGHT && startingNote + 1 < 127) startingNote++;
+    
+    lcd.setCursor(LCD_X - 3, 0);
+    showNote(startingNote);
+  }
   else if (menuState == SAVE) {
     if (b == BUTTON_LEFT || b == BUTTON_RIGHT) {
       saveEEPROMValues();
@@ -534,10 +548,11 @@ void showMenuItem() {
  * 
  * @param uint8_t note
  
- * Simple stub function to output midi note based with presets
+ * Simple function to output midi note
  * 
  */
 void sendMidiNote(uint8_t note) {
+  if (note > 127) note = 127; //max possible note value
   uint8_t v = 0x45;
   
   //loop through knob controller ids to find if one is mapped to velocity, use last value
