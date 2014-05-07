@@ -122,8 +122,8 @@ uint8_t startingNote = 0x1E;
 long lastTime = 0; //debug variable used to hold loop start time
 
 //Menu system setup and states
-#define NUMMENU 9       //increase to match new menu options
-enum menuItems { SETVOICE, SETPOT0, SETPOT1, SETPOT2, SETPOT3, SETPOT4, SETPOT5, SETSTART_NOTE, SAVE };
+#define NUMMENU 10       //increase to match new menu options
+enum menuItems { SETVOICE, SETPOT0, SETPOT1, SETPOT2, SETPOT3, SETPOT4, SETPOT5, SETSTART_NOTE, SETSCALE, SAVE };
 uint8_t menuState = SETVOICE;
 prog_char menu_0[] PROGMEM = "Set Voice";
 prog_char menu_1[] PROGMEM = "Set Knob 1";
@@ -133,8 +133,9 @@ prog_char menu_4[] PROGMEM = "Set Knob 4";
 prog_char menu_5[] PROGMEM = "Set Joy X";
 prog_char menu_6[] PROGMEM = "Set Joy Y";
 prog_char menu_7[] PROGMEM = "Start Note";
-prog_char menu_8[] PROGMEM = "Save Settings";
-PROGMEM const char *menuTable[] = { menu_0, menu_1, menu_2, menu_3, menu_4, menu_5, menu_6, menu_7, menu_8 };
+prog_char menu_8[] PROGMEM = "Scale Selection";
+prog_char menu_9[] PROGMEM = "Save Settings";
+PROGMEM const char *menuTable[] = { menu_0, menu_1, menu_2, menu_3, menu_4, menu_5, menu_6, menu_7, menu_8, menu_9 };
 char menuBuffer[LCD_X + 1];       //max lcd size + null terminator
 
 //Note names
@@ -143,7 +144,8 @@ char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#"
 //Scale patterns
 #define WHOLE 2
 #define HALF  1
-#define CHROMATIC 0
+#define CHROMATIC   0
+#define NUMOFSCALES 3
 prog_uchar majorScale[] PROGMEM = { WHOLE, WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF };
 prog_uchar minorScale[] PROGMEM = { WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF, WHOLE };
 PROGMEM const prog_uchar *scales[] = { CHROMATIC, majorScale, minorScale };
@@ -525,6 +527,14 @@ void buttonPressed(uint8_t b) {
     
     lcd.setCursor(LCD_X - 3, 0);
     showNote(startingNote);
+  }
+  else if (menuState == SETSCALE) {
+    if (b == BUTTON_LEFT && selectedScale > 0) selectedScale--;
+    else if (b == BUTTON_RIGHT && selectedScale + 1 < NUMOFSCALES) selectedScale++;
+    
+    strcpy_P(scaleNameBuffer, (char*)pgm_read_word(&(scaleNameTable[selectedScale]))); //load text from progmem
+    lcd.setCursor(0, 1);
+    lcd.print(scaleNameBuffer);
   }
   else if (menuState == SAVE) {
     if (b == BUTTON_LEFT || b == BUTTON_RIGHT) {
