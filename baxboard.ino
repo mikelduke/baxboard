@@ -82,6 +82,7 @@
 #define ADR_POT4      5
 #define ADR_POT5      6
 #define ADR_STARTNOTE 7
+#define ADR_SCALE     8
 
 
 //Trellis setup
@@ -95,9 +96,6 @@ Adafruit_TrellisSet trellis =  Adafruit_TrellisSet(&matrix0, &matrix1, &matrix2,
 SoftwareSerial softMidi(MIDIIN, MIDIOUT);
 
 LiquidCrystal_I2C lcd(I2C_ADDR,En_pin,Rw_pin,Rs_pin,D4_pin,D5_pin,D6_pin,D7_pin);
-
-//Note names
-char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#" };
 
 const String boardName = "baxboard";
 
@@ -138,6 +136,27 @@ prog_char menu_7[] PROGMEM = "Start Note";
 prog_char menu_8[] PROGMEM = "Save Settings";
 PROGMEM const char *menuTable[] = { menu_0, menu_1, menu_2, menu_3, menu_4, menu_5, menu_6, menu_7, menu_8 };
 char menuBuffer[LCD_X + 1];       //max lcd size + null terminator
+
+//Note names
+char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B", "C", "C#", "D", "D#" };
+
+//Scale patterns
+#define WHOLE 2
+#define HALF  1
+#define CHROMATIC 0
+prog_uchar majorScale[] PROGMEM = { WHOLE, WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF };
+prog_uchar minorScale[] PROGMEM = { WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF, WHOLE };
+PROGMEM const prog_uchar *scales[] = { CHROMATIC, majorScale, minorScale };
+uint8_t selectedScale = CHROMATIC;
+uint8_t scaleBuffer[7];   //7 to hold full scale array
+
+//Scale names
+prog_char chromScaleName[] PROGMEM = "Chromatic";
+prog_char majorScaleName[] PROGMEM = "Major";
+prog_char minorScaleName[] PROGMEM = "Minor";
+PROGMEM const char *scaleNameTable[] = { chromScaleName, majorScaleName, minorScaleName };
+char scaleNameBuffer[LCD_X + 1];
+
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -226,6 +245,9 @@ void loadEEPROMValues() {
   
   readVal = EEPROM.read(ADR_STARTNOTE);
   if (readVal < 255) startingNote = readVal;
+  
+  readVal = EEPROM.read(ADR_SCALE);
+  if (readVal < 255) selectedScale = readVal;
 }
 
 /**
@@ -245,6 +267,7 @@ void saveEEPROMValues() {
   EEPROM.write(ADR_POT4, midiController[4]);
   EEPROM.write(ADR_POT5, midiController[5]);
   EEPROM.write(ADR_STARTNOTE, startingNote);
+  EEPROM.write(ADR_SCALE, selectedScale);
 }
 
 /**
