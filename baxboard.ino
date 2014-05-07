@@ -23,6 +23,7 @@
 #define DEBUG_MIDI           false
 #define DEBUG_LOOP_TIME      false
 #define DEBUG_BUTTON_PRESSED false
+#define DEBUG_SCALES         false
 
 //PINS
 #define MIDIOUT 2  //Pins to use for software serial for midi out
@@ -146,11 +147,9 @@ char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#"
 #define HALF  1
 #define CHROMATIC   0
 #define NUMOFSCALES 3
-prog_uchar majorScale[] PROGMEM = { WHOLE, WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF };
-prog_uchar minorScale[] PROGMEM = { WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF, WHOLE };
-PROGMEM const prog_uchar *scales[] = { CHROMATIC, majorScale, minorScale };
+uint8_t scales[][7] = {  { WHOLE, WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF },     //major
+                         { WHOLE, HALF, WHOLE, WHOLE, HALF, WHOLE, WHOLE }  };  //minor
 uint8_t selectedScale = CHROMATIC;
-uint8_t scaleBuffer[7];   //7 to hold full scale array
 
 //Scale names
 prog_char chromScaleName[] PROGMEM = "Chromatic";
@@ -452,6 +451,7 @@ uint8_t mapButton(uint8_t button) {
  */
 void trellisPressed(uint8_t b) {
   b += startingNote;
+  b = buttonToScaleMap(b);
   showNote(b);
   sendMidiNote(b);
 }
@@ -649,4 +649,49 @@ void showNote(uint8_t note) {
  */
 char* noteToString(uint8_t note) {
   return midiNotes[note % 12];
+}
+
+uint8_t buttonToScaleMap(uint8_t b) {
+  #if DEBUG_SCALES
+    Serial.print("Button: ");
+    Serial.print(b);
+    Serial.print(", ");
+    Serial.print(noteToString(b));
+  #endif
+  if (selectedScale == CHROMATIC) {
+    #if DEBUG_SCALES
+      Serial.println(" Chromatic ");
+    #endif
+    
+    return b;
+  }
+  
+  uint8_t x = (b - startingNote) % 8;  //button x
+  uint8_t note = (b - x) * (12 / 8);
+  //note += ( 12 / 8 * b );
+  if (note > 127) return note;
+  
+  #if DEBUG_SCALES
+    Serial.print(" x: ");
+    Serial.print(x);
+  #endif
+  
+  for (uint8_t i = 0; i < x; i++) {
+    uint8_t scaleNote = scales[selectedScale-1][i];
+    
+  #if DEBUG_SCALES
+    Serial.print(" scale note: ");
+    Serial.print(scaleNote);
+  #endif
+  
+    note += scaleNote; //add scale notes
+  }
+  
+  #if DEBUG_SCALES
+    Serial.print(" Note: ");
+    Serial.print(note);
+    Serial.print(", ");
+    Serial.println(noteToString(note));
+  #endif
+  return note;
 }
