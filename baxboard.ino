@@ -145,17 +145,28 @@ char* midiNotes[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#"
 //Scale patterns
 #define WHOLE 2
 #define HALF  1
+#define WHOLEANDHALF 3
 #define CHROMATIC   0
-#define NUMOFSCALES 3
-uint8_t scales[][7] = {  { WHOLE, WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF },     //major
-                         { WHOLE, HALF, WHOLE, WHOLE, HALF, WHOLE, WHOLE }  };  //minor
+#define NUMOFSCALES 7    //number of scales + 1 for chromatic
+uint8_t scales[][7] = {  { WHOLE, WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF },       //major
+                         { WHOLE, HALF, WHOLE, WHOLE, HALF, WHOLE, WHOLE },       //minor
+                         { WHOLE, HALF, WHOLE, WHOLE, HALF, WHOLEANDHALF, HALF }, //harmonic minor
+                         { WHOLE, HALF, WHOLE, WHOLE, WHOLE, WHOLE, HALF },       //melodic minor
+                         { WHOLE, HALF, WHOLE, WHOLE, WHOLE, HALF, WHOLE },       //dorian
+                         { WHOLE, WHOLE, HALF, WHOLE, WHOLE, HALF, WHOLE }        //mixolydian
+                      };
 uint8_t selectedScale = CHROMATIC;
 
 //Scale names
 prog_char chromScaleName[] PROGMEM = "Chromatic";
 prog_char majorScaleName[] PROGMEM = "Major";
 prog_char minorScaleName[] PROGMEM = "Minor";
-PROGMEM const char *scaleNameTable[] = { chromScaleName, majorScaleName, minorScaleName };
+prog_char harmScaleName[]  PROGMEM = "Harmonic";
+prog_char melScaleName[]   PROGMEM = "Melodic";
+prog_char dorScaleName[]   PROGMEM = "Dorian";
+prog_char mixScaleName[]   PROGMEM = "Mixolydian";
+PROGMEM const char *scaleNameTable[] = { chromScaleName, majorScaleName, minorScaleName, 
+    harmScaleName, melScaleName, dorScaleName, mixScaleName };
 char scaleNameBuffer[LCD_X + 1];
 
 
@@ -651,6 +662,12 @@ char* noteToString(uint8_t note) {
   return midiNotes[note % 12];
 }
 
+
+/**
+ * buttonToScaleMap
+ *
+ * TODO: add descritpion, find a better pattern for the Y axis
+ */
 uint8_t buttonToScaleMap(uint8_t b) {
   #if DEBUG_SCALES
     Serial.print("Button: ");
