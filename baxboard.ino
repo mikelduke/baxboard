@@ -41,8 +41,8 @@
 #define MIDI_BAUD 31250
 #define SERIAL_BAUD 9600
 
-#define MAIN_LOOP_DELAY 30      //delay needed for trellis, maybe could be reduced?
-#define TRELLIS_BUTTON_DELAY 10 //delay for i2c operations
+#define MAIN_LOOP_DELAY 20      //delay needed for trellis, maybe could be reduced?
+#define TRELLIS_BUTTON_DELAY  5 //delay for i2c operations
 
 //I2C LCD
 #define I2C_ADDR      0x27  // Define I2C Address where the PCF8574A is
@@ -178,8 +178,6 @@ void setup() {
   lcd.begin (LCD_X, LCD_Y);
   lcd.setBacklightPin(BACKLIGHT_PIN,POSITIVE);
   lcd.setBacklight(HIGH);
-  lcd.home();
-  lcd.print("Startup");
   
   softMidi.begin(MIDI_BAUD);
   
@@ -187,6 +185,10 @@ void setup() {
   for (uint8_t i = 0; i < NUMPOTS; i++)
     lastPotVal[i] = 0;
   readKnobs();
+  
+  lcd.clear();
+  lcd.home();
+  lcd.print("Startup");
   
   //init buttons
    for (uint8_t i = 0; i < NUMBUTTONS; i++) {
