@@ -1,14 +1,70 @@
-/***************************************************
+/******************************************************************************
 
   baxboard
   
-  http://www.mikelduke.com
+  Created by Mikel Duke http://www.mikelduke.com
   
-  https://github.com/mikelduke/baxboard
+  Code https://github.com/mikelduke/baxboard
   
-  GPLv2
+  Released under GPLv2
   
-***************************************************/
+  *********************************************************
+
+  This program is used in the Baxboard, a Midi Controller containing an 
+  Arduino Nano, 4 Adafruit Trellis button boards, 4 pots, 4 momentary switches,
+  a joystick, an I2C LCD, and a Midi plug.
+  
+  Compiles with 1.0.5 of the Arduino IDE
+  
+  *********************************************************
+  
+  Hardware
+  
+  The Midi out should go to a 5pin MIDI connector, pinout can be found in the 
+  Arduino Midi Guide for Midi Out.
+  
+  http://arduino.cc/en/Tutorial/Midi?from=Tutorial.MIDI
+  
+  The buttons are 4 Adafruit Trellis boards with leds using the 70, 71, 72, 
+  and 73 addresses. Rearrange the addresses in the Trellis.begin call as 
+  needed.
+  
+  https://learn.adafruit.com/adafruit-trellis-diy-open-source-led-keypad/overview
+  
+  The LCD is an I2C LCD. I used a Sainsmart brand, but others could also be 
+  used. The pin numbers for others may need to be changed.
+  
+  Example: http://www.sainsmart.com/new-sainsmart-iic-i2c-twi-1602-serial-lcd-module-display-for-arduino-uno-mega-r3.html
+  
+  *********************************************************
+  
+  Additional Libraries Used
+  
+  LiquidCrystal I2C - http://hmario.home.xs4all.nl/arduino/LiquidCrystal_I2C/
+  Adafruit Trellis  - https://github.com/adafruit/Adafruit_Trellis_Library
+  
+  *********************************************************
+  
+  Pins
+  
+  A0 - Joystick
+  A1 - Joystick
+  A2 - Knob
+  A3 - Knob
+  A4 - I2C SDA
+  A5 - I2C SCL
+  A6 - Knob
+  A7 - Knob
+  D2 - Midi Out
+  D3 - Midi In (Currently Unused)
+  D4 - Button
+  D5 - Button
+  D6 - Button
+  D7 - Button
+  
+  Buttons are set to use Internal Pull-ups.
+  
+******************************************************************************/
 
 #include <Wire.h>
 #include "Adafruit_Trellis.h"
@@ -44,7 +100,7 @@
 #define MAIN_LOOP_DELAY 20      //delay needed for trellis, maybe could be reduced?
 #define TRELLIS_BUTTON_DELAY  5 //delay for i2c operations
 
-//I2C LCD
+//I2C LCD - Pin numbers may need to be modified for different lcds
 #define I2C_ADDR      0x27  // Define I2C Address where the PCF8574A is
 #define BACKLIGHT_PIN 3
 #define En_pin  2
@@ -458,9 +514,11 @@ uint8_t mapButton(uint8_t button) {
 /**
  * trellisPressed
  * 
- * @param uint8_t b - Corrected button number
+ * @param uint8_t b - Corrected button number (0-63) beginning at bottom left
  *
- * TODO: check settings to change what should happen when a button is pressed
+ * Adds starting note to the corrected button number (0-63) to the scale 
+ * position if one is selected (I-VII), displays the note name, and sends 
+ * the midi NOTE ON command.
  */
 void trellisPressed(uint8_t b) {
   b += startingNote;
@@ -637,6 +695,8 @@ void midiCommand(uint8_t cmd, uint8_t pitch, uint8_t velocity) {
  * @param note - Note number (0-127)
  *
  * Displays the note name on the lcd returned by noteToString and adds the octave
+ *
+ * Note: Some software counts octaves from 1, this counts from 0
  */
 void showNote(uint8_t note) {
   lcd.setCursor(0, LCD_Y);
@@ -668,7 +728,22 @@ char* noteToString(uint8_t note) {
 /**
  * buttonToScaleMap
  *
- * TODO: add descritpion, find a better pattern for the Y axis
+ * @param b - Corrected Button Number + Starting note
+ *
+ * @return Midi note value (0-127)
+ *
+ * Converts the corrected button number + starting note, to the note on the 
+ * selected scale (I, II, III, IV, V, VI, VII, I) by column for the scale 
+ * starting with the note of the leftmost button. 
+ *
+ * The Rows increment based on the 8th increment from the starting note, with 
+ * the 4th row being two octaves higher.
+ * Ex: Starting note C3, Major scale, Rows are from bottom up: 
+ *    C3, G#3, E4, C5, G#5, E6, C7, G#7
+ * 
+ * If selected scale is Chromatic, returns b.
+ * 
+ * TODO: Find a better pattern for the Y axis, or make it configurable
  */
 uint8_t buttonToScaleMap(uint8_t b) {
   #if DEBUG_SCALES
